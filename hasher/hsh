@@ -101,7 +101,7 @@ EOF
 	exit
 }
 
-TEMP=`getopt -n $PROG -o $getopt_common_opts -l apt-config:,apt-prefix:,build-args:,build-srpm-only,cache-compress:,cache-dir:,cleanup-only,contents-index-all:,contents-index-bin:,eager-cleanup,excludedocs,hasher-priv-dir:,initroot-only,install-langs:,lazy-cleanup,mountpoints:,repo-mountpoints:,no-cache,no-contents-indices,no-repackage-source,no-sisyphus-check::,no-sisyphus-check-in::,no-sisyphus-check-out::,no-stuff,nprocs:,number:,packager:,pkg-build-list:,pkg-init-list:,predb-prog:,query-repackage,no-query-repackage,query-req-prog:,printenv,rebuild-prog:,repackage-source,repo:,repo-bin:,repo-src:,images:,rpmbuild-args:,save-fakeroot,target:,wait-lock,no-wait-lock,img-apt-config:,without-stuff,with-stuff,with-qemu:,workdir:,$getopt_common_longopts -- "$@"` ||
+TEMP=`getopt -n $PROG -o $getopt_common_opts -l apt-config:,apt-no-update,apt-prefix:,build-args:,build-srpm-only,cache-compress:,cache-dir:,cleanup-only,contents-index-all:,contents-index-bin:,eager-cleanup,excludedocs,hasher-priv-dir:,initroot-only,install-langs:,lazy-cleanup,mountpoints:,repo-mountpoints:,no-cache,no-contents-indices,no-repackage-source,no-sisyphus-check::,no-sisyphus-check-in::,no-sisyphus-check-out::,no-stuff,nprocs:,number:,packager:,pkg-build-list:,pkg-init-list:,predb-prog:,query-repackage,no-query-repackage,query-req-prog:,printenv,rebuild-prog:,repackage-source,repo:,repo-bin:,repo-src:,images:,rpmbuild-args:,save-fakeroot,target:,wait-lock,no-wait-lock,img-apt-config:,without-stuff,with-stuff,with-qemu:,workdir:,$getopt_common_longopts -- "$@"` ||
 	show_usage
 prepare_cgroup "$TEMP" "$0" "$@"
 eval set -- "$TEMP"
@@ -117,6 +117,8 @@ while :; do
 		--apt-config)
 			apt_config="$(opt_check_read "$1" "$2")"
 			shift
+			;;
+		--apt-no-update) apt_no_update=1
 			;;
 		--apt-prefix)
 			apt_prefix="$(opt_check_dir "$1" "$2")"
@@ -365,6 +367,7 @@ handle_package()
 		${quiet:+$quiet} \
 		${verbose:+$verbose} \
 		${no_stuff:+--no-stuff} \
+		${apt_no_update:+--no-update} \
 		#
 	hsh-mkchroot --no-lock "$workdir" \
 		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
