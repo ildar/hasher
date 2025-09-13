@@ -340,7 +340,7 @@ handle_package()
 	fi
 	[ -z "${f##/*}" ] || f="$saved_cwd/$f"
 
-	rm -rf aptbox
+	#rm -rf aptbox
 	if [ -d chroot ]; then
 		deduce_lock_hasher_priv
 		hsh-rmchroot --no-lock "$workdir" \
@@ -368,6 +368,7 @@ handle_package()
 		${verbose:+$verbose} \
 		${no_stuff:+--no-stuff} \
 		${apt_no_update:+--no-update} \
+		||:
 		#
 	hsh-mkchroot --no-lock "$workdir" \
 		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
