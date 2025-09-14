@@ -229,13 +229,15 @@ __EOF__
 	cat >>"$entry" <<__EOF__
 if grep -qs ^rooter: /etc/passwd 2>/dev/null; then
 	userdel rooter
-	groupadd -g $gid1 rooter
-	useradd -M -u $uid1 -g $gid1 -d /root rooter
+	addgroup -g $gid1 rooter
+	adduser -S -s /bin/sh -H -u $uid1 -g $gid1 -h /root rooter
 fi
 if grep -qs ^builder: /etc/passwd 2>/dev/null; then
 	userdel builder
-	groupadd -g $gid2 builder
-	useradd -M -u $uid2 -g $gid2 -d /usr/src builder
+	delgroup abuild ||:
+	addgroup -g $gid2 abuild
+	adduser -S -s /bin/sh -H -u $uid2 -g $gid2 -h /usr/src builder
+	mkdir -p /usr/src
 	chmod $verbose 1777 /usr/src >&2
 fi
 __EOF__
@@ -263,12 +265,12 @@ create_chroot()
 	copy_chroot_incoming $initlist
 
 	local f
-	for f in $initlist; do
-		rpm2cpio "$f" |wlimit_time_elapsed=$wlimit_time_long wlimit_time_idle=$wlimit_time_long \
-		    chrootuid1 /.host/cpio --extract --make-directories --sparse --quiet --preserve-modification-time &&
+	chrootuid1 /.host/apk --repositories-file /dev/null --initdb add
+	wlimit_time_elapsed=$wlimit_time_long wlimit_time_idle=$wlimit_time_long \
+	    chrootuid1 /.host/sh -c "/.host/apk --allow-untrusted --force-non-repository \
+	        add /.in/*.apk" $([ -n "$verbose" ] || echo -q) &&
 			verbose "Unpacked ${f##*/}." ||
 			fatal "Unpack of ${f##*/} failed."
-	done
 	verbose 'Unpacked initial package list.'
 	if [ -n "$save_fakeroot" ]; then
 		wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short \
@@ -318,8 +320,8 @@ __EOF__
 	verbose "Created entry point: $entry"
 
 	wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short wlimit_bytes_written=$wlimit_bytes_out \
-	    chrootuid1 </dev/null &&
-		verbose 'Created RPM database.' ||
+	    true chrootuid1 </dev/null &&
+		true verbose 'Created RPM database.' ||
 		fatal 'Failed to create RPM database.'
 
 	create_entry_fakeroot_header
@@ -330,8 +332,8 @@ ${rpmi:-$def_rpmi} -i $verbose --ignorearch ${exclude_docs:+--excludedocs} --jus
 __EOF__
 
 	wlimit_time_elapsed=$wlimit_time_long wlimit_time_idle=$wlimit_time_short \
-	    chrootuid1 </dev/null &&
-		verbose 'Installed initial package list.' ||
+	    true chrootuid1 </dev/null &&
+		true verbose 'Installed initial package list.' ||
 		fatal 'Failed to install initial package list.'
 
 	purge_chroot_in
@@ -382,7 +384,8 @@ noinst_list="$(for f in $buildlist; do
 	done
 done)"
 [ -z "\$noinst_list" ] || rpm_nodeps="--nodeps"
-[ -z "\$inst_list" ] || ${rpmi:-$def_rpmi} -i --ignorearch ${exclude_docs:+--excludedocs} \$rpm_nodeps \$inst_list
+[ -z "\$inst_list" ] || apk --allow-untrusted --force-non-repository \
+	        add \$inst_list $([ -n "$verbose" ] || echo -q)
 [ -z "\$noinst_list" ] || ${rpmi:-$def_rpmi} -i --ignorearch ${exclude_docs:+--excludedocs} --nodeps --justdb \$noinst_list
 __EOF__
 
@@ -398,20 +401,22 @@ __EOF__
 
 		create_entry_fakeroot_header
 		cat >>"$entry" <<__EOF__
-ldconfig
-rpmdb --rebuilddb
+#ldconfig
+#rpmdb --rebuilddb
 if type adjust_kernel_headers >/dev/null 2>&1; then
 	adjust_kernel_headers
 fi
 if [ -x /.host/postin ]; then
 	/.host/postin
 fi
-groupadd -g $gid0 caller ||:
-useradd -M -u $uid0 -g $gid0 -d / caller ||:
-groupadd -g $gid1 rooter
-useradd -M -u $uid1 -g $gid1 -d /root rooter
-groupadd -g $gid2 builder
-useradd -M -u $uid2 -g $gid2 -d /usr/src builder
+addgroup -g $gid0 caller
+adduser -S -s /bin/sh -H -u $uid0 -g $gid0 -h / caller
+addgroup -g $gid1 rooter
+adduser -S -s /bin/sh -H -u $uid1 -g $gid1 -h /root rooter
+delgroup abuild ||:
+addgroup -g $gid2 abuild
+adduser -S -s /bin/sh -H -u $uid2 -g $gid2 -h /usr/src builder
+mkdir -p /usr/src
 chmod $verbose 1777 /usr/src >&2
 __EOF__
 

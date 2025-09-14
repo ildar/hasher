@@ -10,6 +10,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 
+# TODO:
+# 1. toxic vars:
+# rpmi
+# repo_src
+# 2. mutate:
+# rpmdb -> apkdb
+
 unset CDPATH ||:
 PROG="${0##*/}"
 
@@ -50,6 +57,14 @@ umask 022
 saved_cwd="$(/bin/pwd)"
 
 ### Begin configuration variables
+
+# apk executable: must be statically linked
+prog_apk=apk.static
+Helpify prog_apk
+
+# path to `repositories` file
+reps_file=/etc/apk/repositories
+Helpify reps_file
 
 # path to custom apt.conf file
 apt_config=
@@ -145,12 +160,12 @@ Helpify repackage_source
 Helpify no_repackage_source repackage_source
 
 # build stage package file list
-pkg_build_list='basesystem rpm-build>=0:4.0.4-alt21 kernel-headers-common>=0:1.1.4-alt1 sisyphus_check>=0:0.7.3 time'
+pkg_build_list='abuild alpine-sdk coreutils' # coreutils has cmd:time
 build_list=
 Helpify pkg_build_list
 
 # initial stage package file list
-pkg_init_list='setup filesystem rpm fakeroot>=0:0.7.3'
+pkg_init_list='alpine-base fakeroot util-linux-misc'
 init_list=
 Helpify pkg_init_list
 
@@ -175,7 +190,7 @@ noinstall_pattern_list='dev[-_][0-9]* dev[-_]minimal[-_][0-9]*'
 Helpify pkg_noinstall_pattern_list noinstall_pattern_list
 
 # repo directory.
-def_repo=repo
+def_repo=packages
 repo=
 Helpify repo def_repo
 
@@ -209,7 +224,7 @@ install_resolver_configuration_files=
 Helpify install_resolver_configuration_files
 
 # target architecture.
-def_target="$(rpm --showrc |sed -ne 's/^install arch[[:space:]]*:[[:space:]]*\([^[:space:]]\+\).*/\1/p')"
+def_target="$($prog_apk --help 2>/dev/null | grep ^apk-tools | sed -ne 's/^apk-tools .* compiled for \([^.]\+\).*/\1/p')"
 [ -n "$def_target" ] || def_target="$(uname -m)"
 target=
 Helpify target def_target
@@ -398,12 +413,14 @@ make_repo()
 	if [ -n "$repo_src" -o -n "$repo_bin" ]; then
 		mkdir -p $verbose -- ${repo_src:+"$repo_src"} ${repo_bin:+"$repo_bin"} >&2
 	fi
-	mkdir -p $verbose -- ${repo:-$def_repo}/{SRPMS,${target:-$def_target}/RPMS}.hasher >&2
+	mkdir -p $verbose -- ${repo:-$def_repo}/aports/${target:-$def_target} >&2
 }
 
 # assumed: defined variables: hash
 update_RPM_database()
 {
+verbose update_RPM_database\(\) called, doing nothing
+return
 	local extra_args=
 	while [ -n "${1-}" -a -z "${1##-*}" ]; do
 		extra_args="$extra_args $1"
@@ -720,9 +737,12 @@ allocate_lock_hasher_priv()
 print_uris()
 {
 	local out
-	local options='-q -y -o RPM::PM=external -o Dir::Bin::rpm=hsh-rpmi-print-files'
+	# ignoring version conditions
+	local args=$(for p do p="${p%%>*}";p="${p%%~*}"; echo -n "$p "; done) # no $pkgname<=$pkgver in ref
+	local options="-R"
+	[ -d "$chroot"/etc ] || options="$options --root $aptbox/tmp"
 	if [ -z "$verbose" ]; then
-		out="$("$aptbox/apt-get" $options install -- "$@" 2>&1)" || {
+		out="$("$aptbox/apk" fetch $options --simulate -o /dev/null -- $args 2>&1)" || {
 			local rc=$?
 			printf %s\\n "$out" >&2
 			[ $rc -le 128 ] ||
@@ -730,7 +750,7 @@ print_uris()
 			fatal 'Failed to calculate package file list.'
 		}
 	else
-		out="$(set -o pipefail; "$aptbox/apt-get" $options install -- "$@" 2>&1 |
+		out="$(set -o pipefail; "$aptbox/apk" fetch $options --simulate -o /dev/null -- $args 2>&1 |
 		       tee -a /dev/stderr)" || {
 			local rc=$?
 			[ $rc -le 128 ] ||
@@ -738,8 +758,11 @@ print_uris()
 			fatal 'Failed to calculate package file list.'
 		}
 	fi
+	# actually fetch
+	"$aptbox/apk" fetch $options -o $aptbox/var/cache/apk/ -q -- $args
 
-	printf %s "$out" |LC_ALL=C grep '^/.*\.rpm$' || [ $? -eq 1 ]
+	printf %s "$out" |LC_ALL=C grep '^Downloading ' | \
+		sed "s|^Downloading |$aptbox/var/cache/apk/| ; s/$/.apk/"
 	verbose 'Calculated package file list.'
 }
 
