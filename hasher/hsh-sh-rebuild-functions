@@ -503,7 +503,8 @@ abuild_query_spec()
 {
 	# assume the chroot is propagated and $HOME/aports/%SOMETHING%/APKBUILD exists
 	REQ="
-echo \"echo $@\" | \
+export CLIBC=$CLIBC
+echo \"echo $@\" | tr @ '$' | \
   cat \$HOME/aports/*/APKBUILD - | \
   sh
 "
@@ -527,11 +528,17 @@ install_deps_aport()
 	else
 		CLIBC=musl
 	fi
-	deps=`abuild_query_spec '\\$makedepends \\$checkdepends \\$makedepends_build \\$makedepends_host' |
+	local options=`abuild_query_spec '@options' | tr ' ' '\n' | sort -u`
+	# "!check" option
+	local _checkdepends=
+	echo "$options" | grep -q '!check' || _checkdepends='@checkdepends'
+	deps=`abuild_query_spec "@makedepends @depends $_checkdepends @makedepends_build @makedepends_host" |
 		tr ' ' '\n' | sort -u |
 		sed s/^$CLIBC:// |
-		grep -v '^(musl|glibc):'`
+		grep -Ev '^(musl|glibc):'`
+	verbose Build dependencies: $deps
 	test -n "$deps" &&
+	deps="abuild $deps" &&
 	hsh-install --no-lock \
 		${quiet:+$quiet} \
 		${verbose:+$verbose} \
@@ -619,15 +626,15 @@ __EOF__
 build_aport()
 {
 	local _check=
-	local options=`abuild_query_spec '\\\$options' | tr ' ' '\n' | sort -u`
-	verbose "APKBUILD options: $options"
-	echo "$options" | grep -q '^!check' || test -z "$abuild_skip_check" && _check="check"
+	local options=`abuild_query_spec '@options' | tr ' ' '\n' | sort -u`
+	echo "APKBUILD options: $options"
+	! { echo "$options" | grep -q '^!check'; } && test -z "$abuild_skip_check" && _check="check"
 	# abuild always works with /proc mounted
 	[ -z "$required_mountpoints" ] &&
 		required_mountpoints="/proc" ||
 		required_mountpoints="$required_mountpoints,/proc"
-	# implement "net" option
-	echo "$options" | grep -qv '^net$' && export share_network=1 &&
+	# "net" option
+	echo "$options" | grep -q '^net$' && export share_network=1 &&
 		for f in /etc/host.conf /etc/hosts /etc/resolv.conf; do
 			if [ -r "$f" -a -s "$f" ]; then
 				create_entry_fakeroot_header
@@ -640,7 +647,6 @@ __EOF__
 					fatal "Failed to install $f file."
 			fi
 		done
-
 
 	local _remove_libc_tags=
 	grep -q remove_libc_tags "$chroot"/usr/bin/abuild && _remove_libc_tags=remove_libc_tags
@@ -683,7 +689,7 @@ copy_results_packages()
 	repo_bin="${repo_bin:-${repo:-$def_repo}/aports/"${target:-$def_target}"/}"
 
 	find chroot/.out/ -mindepth 1 -maxdepth 1 -type f -name \*.apk -print0 |
-		xargs -r0 mv -f $verbose --target-directory="$repo_bin" -- >&2
+		xargs -r0 cp -af --no-preserve=ownership $verbose --target-directory="$repo_bin" -- >&2
 	purge_chroot_out
 	( cd "$repo_bin" ; set +f
 	"$prog_apk" index --no-warnings --quiet --description "hasher generated" \
