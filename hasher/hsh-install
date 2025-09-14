@@ -154,9 +154,9 @@ if [ -s .rpmi-justdb.list ]; then
 	${rpmi:-$def_rpmi} -i --ignorearch ${exclude_docs:+--excludedocs} --nodeps --ignoresize --justdb .rpmi-justdb.list
 fi
 if [ -s .rpmi-install.list ]; then
-	${rpmi:-$def_rpmi} -i --ignorearch ${exclude_docs:+--excludedocs} .rpmi-install.list
+	apk --force-non-repository --allow-untrusted add \$(cat .rpmi-install.list) $([ -n "$verbose" ] || echo -qq)
 fi
-ldconfig
+#ldconfig
 if type adjust_kernel_headers >/dev/null 2>&1; then
 	adjust_kernel_headers --first
 fi

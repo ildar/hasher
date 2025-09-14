@@ -131,7 +131,7 @@ if [ -e aptbox -o -L aptbox ]; then
 		cd aptbox
 	else
 		cd aptbox
-		[ -d ./etc/apt -a -d ./var/lib/rpm ] ||
+		[ -d ./etc/apk -a -d ./var/cache/apk ] ||
 			fatal "$aptbox: doesn't look valid."
 	fi
 else
@@ -159,17 +159,11 @@ fi
 
 # create apt/rpm skeleton directories.
 mkdir -p $verbose -- \
-	./etc/apt/{apt.conf,{sources,vendors}.list}.d \
-	./home/user \
-	./var/cache/apt/archives/partial \
-	./var/lib/apt/lists/partial \
-	./var/lib/rpm >&2
+	./var/cache/apk \
+	>&2
 
 # define apt variables.
-prog_apt_get="apt-get"
-prog_apt_cache="apt-cache"
-prog_apt_config="apt-config"
-apt_libdir=
+prog_apk="${prog_apk:-apk.static}"
 if [ -z "$apt_prefix" ]; then
 	apt_libdir="$LD_LIBRARY_PATH"
 else
@@ -191,7 +185,7 @@ else
 		apt_libdir="$LD_LIBRARY_PATH:$apt_libdir"
 	fi
 
-	for n in apt-cache apt-config apt-get; do
+	for n in "$prog_apk"; do
 		prog="$apt_prefix/bin/$n"
 		[ -x "$prog" ] ||
 			fatal "$prog: program not available."
@@ -216,16 +210,16 @@ chmod $verbose a+x setarch >&2
 
 # create aptbox version of ~/.rpmrc if necessary.
 aptbox_home=
-rpm_showrc="$("$aptbox/setarch" rpm --showrc)"
-current_arch="$(printf %s "$rpm_showrc" |sed -ne 's/^install arch[[:space:]]*:[[:space:]]*\([^[:space:]]\+\).*/\1/p')"
+# FIXME:
+current_arch="$def_target"
 [ -n "$current_arch" ] ||
 	current_arch="$(uname -m)"
 [ "$current_arch" != "${target:-$def_target}" ] &&
 	alternate_arch=1 ||
 	alternate_arch=
 if [ -n "$alternate_arch" ] &&
-   ! printf %s "$rpm_showrc" |
-     LC_ALL=C grep -qs "^compatible archs[[:space:]]*:.*\<${target:-$def_target}\>"; then
+   true; then
+	# FIXME later
 	aptbox_home="$aptbox/home/user"
 	for f in "$HOME/.rpmrc" "$HOME/.rpmmacros"; do
 		[ ! -f "$f" ] ||
@@ -235,15 +229,14 @@ if [ -n "$alternate_arch" ] &&
 fi
 
 # Create apt wrappers.
-apt_config_file="$aptbox/etc/apt/apt.conf"
-for n in apt-cache apt-config apt-get; do
+for n in apk; do
 	cat >"$n" <<__EOF__
 #!/bin/sh -e
 ${apt_libdir:+export LD_LIBRARY_PATH="$apt_libdir"}
-APT_CONFIG="$apt_config_file" \
 ${aptbox_home:+HOME="$aptbox_home"} \
 exec $aptbox/setarch \
-$(eval printf %s "$(printf '$prog_%s' "$n" |tr - _)") "\$@"
+$(eval printf %s "$(printf '$prog_%s' "$n" |tr - _)") --root "$aptbox" --allow-untrusted "\$@"
+FIXME: untrusted above
 __EOF__
 	verbose "created $n wrapper"
 	chmod $verbose a+x "$n" >&2
@@ -256,82 +249,29 @@ cat >regenbasedir <<__EOF__
 mkdir -p "$repo"/${target:-$def_target}/base
 genbasedir --topdir="$repo" --no-oldhashfile --bz2only --mapi --bloat ${target:-$def_target} hasher "\$@"
 __EOF__
-verbose "created regenbasedir"
-chmod $verbose a+x regenbasedir >&2
+rm -f regenbasedir >&2
 
-# create initial apt.conf file.
-cat >"$apt_config_file" <<__EOF__
-${apt_config:+$(cat "$apt_config")}
-__EOF__
+# create apk environment skeleton
+"$aptbox/setarch" "$prog_apk" --repositories-file /dev/null --initdb --root "$aptbox" add \
+  $([ -n "$verbose" ] || echo -qq)
+rmdir "$aptbox"/{dev,proc} ||:
+cp -f "$reps_file" etc/apk/repositories
+ln -snf ../../var/cache/apk etc/apk/cache
 
-get_apt_config Dir::Etc::SourceList/f sl_value
-[ -z "${sl_value##/*}" ] &&
-	[ -r "$sl_value" -a -s "$sl_value" ] ||
-	fatal "apt-config: broken Dir::Etc::SourceList: $sl_value"
+echo "${repo_bin:-${repo:-$def_repo}/aports}" >> etc/apk/repositories
 
-# if cdroms.list is not empty, copy it and apt indices into aptbox
-get_apt_config Dir::State::cdroms/f cd_value
-if [ -r "$cd_value" -a -s "$cd_value" ]; then
-	install -p -m644 $verbose "$cd_value" "$aptbox/var/lib/apt/" >&2
+# create a new apk environment tree for use when chroot isn't yet created
+mkdir -p tmp/{lib,var/lib}
+ln -sf ../etc tmp/
+ln -sf ../../var/cache tmp/var/
+mv -f lib/apk tmp/lib/ 2>/dev/null ||:
+mv -f var/lib/apk tmp/var/lib/ 2>/dev/null ||:
 
-	get_apt_config Dir::State::lists/d lists_value
-	if [ -r "$lists_value" -a -d "$lists_value" ]; then
-		find "$lists_value/" -mindepth 1 -maxdepth 1 -perm -444 -type f -exec \
-			install -p -m644 $verbose '{}' "$aptbox/var/lib/apt/lists/" ';' >&2
-	fi
-fi
+# finalize the main aptbox creation
+mkdir -p ./lib ./var/lib
+ln -sf    ../../chroot/lib/apk ./lib/
+ln -sf ../../../chroot/var/lib/apk ./var/lib/
 
-# if preferences file is specified and not empty, copy it into aptbox either
-get_apt_config Dir::Etc::preferences/f prefs_value
-if [ -r "$prefs_value" -a -s "$prefs_value" ]; then
-	install -p -m644 $verbose "$prefs_value" "$aptbox/etc/apt/preferences" >&2
-else
-	prefs_value=
-fi
-get_apt_config Dir::Etc::preferencesparts/d prefsdir_value
-if [ -r "$prefsdir_value" -a -d "$prefsdir_value" ]; then
-	mkdir -p "$aptbox/etc/apt/preferences.d"
-	find "$prefsdir_value/" -mindepth 1 -maxdepth 1 -perm -444 -type f -exec \
-		install -p -m644 $verbose '{}' "$aptbox/etc/apt/preferences.d/" ';' >&2
-else
-	prefsdir_value=
-fi
+verbose "Created APK box in \`$aptbox'."
 
-# if pkgpriorities file is specified and not empty, copy it into aptbox either
-get_apt_config Dir::Etc::pkgpriorities/f prios_value
-if [ -r "$prios_value" -a -s "$prios_value" ]; then
-	install -p -m644 $verbose "$prios_value" "$aptbox/etc/apt/pkgpriorities" >&2
-else
-	prios_value=
-fi
-
-# create final apt.conf file.
-cat >"$apt_config_file" <<__EOF__
-Dir::State "$aptbox/var/lib/apt/";
-Dir::Cache "$aptbox/var/cache/apt/";
-${apt_config:+$(cat "$apt_config")}
-Dir::Etc::SourceList "$aptbox/etc/apt/sources.list";
-Dir::Etc::preferences "$aptbox/etc/apt/preferences";
-Dir::Etc::preferencesparts "$aptbox/etc/apt/preferences.d";
-Dir::Etc::pkgpriorities "$aptbox/etc/apt/pkgpriorities";
-RPM::RootDir "$aptbox";
-APT::Install::Virtual "true";
-APT::Install::VirtualVersion "true";
-${alternate_arch:+APT::Architecture "${target:-$def_target}";}
-__EOF__
-
-verbose "Created APT configuration file \`$apt_config_file'."
-
-# create a new sources.list file.
-target_config="./etc/apt/sources.list"
-cat >"$target_config" <<__EOF__
-${no_stuff:+#}rpm-dir file:$repo ${target:-$def_target} hasher
-$(LC_ALL=C grep '^[^#]' "$sl_value")
-__EOF__
-verbose "Created APT source list file \`$target_config'."
-
-# create a new rpm database.
-"$aptbox/setarch" rpmdb --initdb --dbpath "$aptbox/var/lib/rpm"
-verbose "Created RPM database in \`./var/lib/rpm/'."
-
-[ -z "$update" ] || "$aptbox/apt-get" update $([ -n "$verbose" ] || echo -qq)
+[ -z "$update" ] || "$aptbox/apk" --root "$aptbox"/tmp update $([ -n "$verbose" ] || echo -qq)

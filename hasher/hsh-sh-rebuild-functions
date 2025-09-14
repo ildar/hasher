@@ -139,49 +139,14 @@ __EOF__
 source_package_type=
 install_source_package()
 {
-	copy_chroot_incoming "$source"
+	source=`readlink -f "$source"`
+	# FIXME: should use copy_chroot_incoming "$source" ?
+	( cd `realpath "$source/.."` ; find `basename "$source"` | cpio -o -H newc ) > chroot/.in/source.cpio
 	create_entry_header
 	cat >>"$entry" <<__EOF__
-mkdir -p $verbose -m700 -- "\$TMPDIR" >&2
-rm -rf "\$HOME/in"
-mkdir $verbose -m700 -- "\$HOME/in" >&2
-# Check source file.
-header="\$(od -A n -N 8 -t x1 -- "$(quote_shell "$sname")")"
-case "\$header" in
-	' ed ab ee db '??' '??' 00 01')
-		mkdir $verbose -m700 -- "\$HOME/in/srpm" >&2
-		install -pm644 $verbose "$(quote_shell "$sname")" "\$HOME/in/srpm/" >&2
-		rpmquery --qf '%{buildtime}\\n' -p -- "$(quote_shell "$sname")" > "\$HOME/in/SOURCE_DATE_EPOCH"
-		echo src.rpm
-		exit 0
-		;;
-	' ed ab ee db '*)
-		exit 0
-		;;
-esac
-spec="\$(LC_ALL=C tar -tvf "$(quote_shell "$sname")" 2>/dev/null |
-	sed '/^V---------[[:space:]]\+0\/0[[:space:]]\+0[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+/!d;s///;s/--Volume Header--\$//;q')"
-
-case "\$spec" in
-	*/*)
-		type="\${spec%/*}"
-		spec="\${spec##*/}"
-		case "\$type" in
-			img|oci) ;;
-			*) exit 0 ;;
-		esac
-		;;
-	*) type=pkg.tar ;;
-esac
-
-if [ -n "\$spec" ]; then
-	mkdir $verbose -m700 -- "\$HOME/in/spec" "\$HOME/in/source" >&2
-	tar $verbose -xf "$(quote_shell "$sname")" -C "\$HOME/in/source/" >&2
-	mv $verbose "\$HOME/in/source/\$spec" "\$HOME/in/spec/" >&2
-	date +%s -r "\$HOME/in/spec"/\$spec > "\$HOME/in/SOURCE_DATE_EPOCH"
-	echo "\$type"
-	exit 0
-fi
+	mkdir -p \$HOME/aports
+	cd \$HOME/aports/ ; cpio -i < /.in/source.cpio >/dev/null
+	echo aport #source_package_type
 __EOF__
 	source_package_type="$(wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short wlimit_bytes_written=$wlimit_bytes_out \
 		       chrootuid2 </dev/null)" &&
@@ -195,6 +160,8 @@ __EOF__
 			make_srpm_from_pkgtar '"$HOME/in/srpm"'
 			;;
 		img|oci)
+			;;
+		aport)
 			;;
 		*)
 			fatal "$sname does not look like source package."
@@ -531,3 +498,151 @@ copy_results_img()
 
 	purge_chroot_out
 }
+
+install_deps_aport()
+{
+	# TODO: extract function
+	create_entry_header
+	cat >>"$entry" <<__EOF__
+echo "echo \\\$makedepends \\\$makedepends_build \\\$makedepends_host" | \
+  cat \$HOME/aports/*/APKBUILD - | \
+  sh
+__EOF__
+	deps="$(wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short wlimit_bytes_written=$wlimit_bytes_out \
+		       chrootuid2 </dev/null)" &&
+			verbose "$sname deps list: $deps" ||
+			fatal "$sname: failed to calculate deps"
+	hsh-install --no-lock \
+		${quiet:+$quiet} \
+		${verbose:+$verbose} \
+		${number:+--number=$number} \
+		${exclude_docs:+--excludedocs} \
+		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
+		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
+		-- \
+		"$workdir" $deps
+
+	# prepare env
+	hsh-run ${verbose:+-v} --no-lock \
+		${quiet:+$quiet} \
+		${verbose:+$verbose} \
+		${number:+--number=$number} \
+		${exclude_docs:+--excludedocs} \
+		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
+		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
+		-- \
+		"$workdir" \
+		/bin/sh -c "
+mkdir -p \$HOME/tmp ;
+test -s \$HOME/.ashrc ||
+	echo -e \"export SUDO_APK=true SRCDEST=\$HOME/.distfiles\" | tee \$HOME/.ashrc"
+
+	# fetch the sources
+	echo "nameserver 8.8.8.8" | \
+	hsh-run ${verbose:+-v} --no-lock --rooter \
+		${quiet:+$quiet} \
+		${verbose:+$verbose} \
+		${number:+--number=$number} \
+		${exclude_docs:+--excludedocs} \
+		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
+		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
+		-- \
+		"$workdir" \
+		tee /etc/resolv.conf
+	share_network=1 \
+	hsh-run ${verbose:+-v} --no-lock \
+		${quiet:+$quiet} \
+		${verbose:+$verbose} \
+		${number:+--number=$number} \
+		${exclude_docs:+--excludedocs} \
+		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
+		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
+		-- \
+		"$workdir" \
+		/bin/sh -c "cd \$HOME/aports/* ; . \$HOME/.ashrc ;
+		export CBUILD=${target:-$def_target} ;
+		abuild fetch"
+	hsh-run ${verbose:+-v} --no-lock --rooter \
+		${quiet:+$quiet} \
+		${verbose:+$verbose} \
+		${number:+--number=$number} \
+		${exclude_docs:+--excludedocs} \
+		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
+		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
+		-- \
+		"$workdir" \
+		tee /etc/resolv.conf < /dev/null
+}
+
+run_abuild()
+{
+	create_entry_header
+	cat >>"$entry" <<__EOF__
+export CBUILD=${target:-$def_target}
+cd \$HOME/aports/*
+# prepare build env
+test -s \$HOME/.abuild/builder.rsa || \
+	echo /usr/src/.abuild/builder.rsa | abuild-keygen -a
+target="$(quote_shell "${target:-$def_target}")" /.host/rebuild
+find "\$HOME/packages/aports" -mindepth 2 -maxdepth 2 -type f -name \*.apk -print0 |
+	xargs -r0 mv -f $verbose --target-directory=/.out/ -- >&2
+__EOF__
+
+	requested_mountpoints="$required_mountpoints" \
+	    chrootuid2 </dev/null &&
+		verbose "rebuild of \`$sname' complete." ||
+		fatal "rebuild of \`$sname' failed."
+} # run_abuild
+
+build_aport()
+{
+	# Create rebuild script.
+	if [ -n "$prog_rebuild" ]; then
+		install -p -m755 $verbose "$prog_rebuild" chroot/.host/rebuild >&2
+	else
+		cat >"chroot/.host/rebuild" <<__EOF__
+#!/bin/sh -le
+${verbose:+set -x}
+export -n target ||:
+#SOURCE_DATE_EPOCH="\$(cat -- "\$HOME/in/SOURCE_DATE_EPOCH")"
+#export SOURCE_DATE_EPOCH
+cd \$HOME/aports/*
+. \$HOME/.ashrc
+exec >&2
+# FIXME: handle $_check
+time sh -c "
+for stage in validate builddeps clean unpack prepare build $_check rootpkg; do
+  echo + abuild \\\$stage
+  abuild \\\$stage
+done
+"
+__EOF__
+		chmod 755 "chroot/.host/rebuild"
+		verbose 'Created rebuild script.'
+	fi
+
+	# Build the package.
+	purge_chroot_out
+	run_abuild
+
+	# TODO Execute sisyphus_check for output.
+}
+
+# Copy binaries from chroot.
+copy_results_packages()
+{
+	make_repo
+	repo_bin="${repo_bin:-${repo:-$def_repo}/aports/"${target:-$def_target}"/}"
+
+	find chroot/.out/ -mindepth 1 -maxdepth 1 -type f -name \*.apk -print0 |
+		xargs -r0 mv -f $verbose --target-directory="$repo_bin" -- >&2
+	purge_chroot_out
+	( cd "$repo_bin" ; set +f
+	"$prog_apk" index --no-warnings --quiet --description "hasher generated" \
+		--allow-untrusted --output APKINDEX.tar.gz.$$ \
+		*.apk && \
+		  chmod 644 APKINDEX.tar.gz.$$ && \
+		  mv -f APKINDEX.tar.gz.$$ APKINDEX.tar.gz
+	)
+}
+

@@ -223,6 +223,9 @@ if [ -z "$nodeps" ]; then
 		img)
 			install_deps_img "$prog_query_req"
 			;;
+		aport)
+			install_deps_aport
+			;;
 	esac
 fi
 
@@ -236,6 +239,9 @@ case "$source_package_type" in
 		copy_apt_conf
 		build_img
 		;;
+	aport)
+		build_aport
+		;;
 esac
 
 case "$source_package_type" in
@@ -244,5 +250,8 @@ case "$source_package_type" in
 		;;
 	img|oci)
 		copy_results_img
+		;;
+	aport)
+		copy_results_packages
 		;;
 esac

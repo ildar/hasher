@@ -286,8 +286,8 @@ for f; do
 	[ -z "${f##/*}" ] || f="$saved_cwd/$f"
 	[ -e "$f" ] ||
 		fatal "$f: file not found."
-	[ -f "$f" ] ||
-		fatal "$f: not a regular file."
+	[ -d "$f" ] ||
+		fatal "$f: not an aport folder."
 	[ -r "$f" ] ||
 		fatal "$f: cannot access source."
 	[ -s "$f" ] ||

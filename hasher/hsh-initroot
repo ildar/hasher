@@ -303,7 +303,7 @@ else
 	update_contents
 fi
 
-if [ -n "$build_list" ]; then
+if false; then
 	# Create RPM build directory tree.
 	create_entry_header
 	cat >>"$entry" <<__EOF__
