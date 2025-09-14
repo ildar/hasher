@@ -1,3 +1,20 @@
+hasher mutated for another packaging system
+apk (Alpine Package Manager)
+
+0. mutation notes
+
+  1. `aptbox` term is still used but in the new context. Its meaning almost
+  remains except it is an apk-based folder with apk cache etc.
+  2. We assume having the static version of `apk` on the host in paths
+
+TODO:
+1. all FIXME-s
+2. musl's ldconfig shouldn't fail, report
+3. bbsuid: Only root can install symlinks
+4. audit all "--allow-untrusted" in the code
+5. keep apks
+6. cache sources on host
+7. initroot cache
 
 1. Prepare to work.
 
