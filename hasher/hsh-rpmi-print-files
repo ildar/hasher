@@ -1,4 +1,4 @@
-#!/bin/sh -efu
+#!/bin/bash -efu
 #
 # Copyright (C) 2009  Alexey Tourbin <at@altlinux.org>
 #

@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # The source package rebuild functions for the hsh-rebuild.
 #

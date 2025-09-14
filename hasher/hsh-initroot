@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # The hsh-initroot utility for the hasher project.
 #

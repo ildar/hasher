@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # Run specified program within the hasher chroot.
 #

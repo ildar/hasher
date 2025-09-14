@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 # Usage: hsh --rebuild-prog=path_to_this_script
 
 # install source package

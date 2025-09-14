@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # Contents index routines for hsh-initroot.
 #

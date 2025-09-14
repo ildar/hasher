@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # Put specified file or directory inside hasher chroot.
 #

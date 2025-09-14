@@ -1,4 +1,4 @@
-#!/bin/sh -ef
+#!/bin/bash -ef
 #
 # The hsh-rebuild utility for the hasher project.
 #
