@@ -185,13 +185,12 @@ else
 		apt_libdir="$LD_LIBRARY_PATH:$apt_libdir"
 	fi
 
-	for n in "$prog_apk"; do
+	local n="$prog_apk"
 		prog="$apt_prefix/bin/$n"
 		[ -x "$prog" ] ||
 			fatal "$prog: program not available."
 		var="$(printf 'prog_%s' "$n" |tr - _)"
 		eval "$var=\"$(quote_shell "$prog")\""
-	done
 fi
 if printf %s "$apt_libdir" |LC_ALL=C grep -qs '[`"$\]'; then
 	fatal "$LD_LIBRARY_PATH: illegal symbols in LD_LIBRARY_PATH."

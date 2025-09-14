@@ -240,6 +240,7 @@ if grep -qs ^builder: /etc/passwd 2>/dev/null; then
 	mkdir -p /usr/src
 	chmod $verbose 1777 /usr/src >&2
 fi
+echo 'export ENV=~/.ashrc' > /etc/profile.d/ashrc.sh
 __EOF__
 
 	wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short wlimit_bytes_written=$wlimit_bytes_out \
@@ -418,6 +419,7 @@ addgroup -g $gid2 abuild
 adduser -S -s /bin/sh -H -u $uid2 -g $gid2 -h /usr/src builder
 mkdir -p /usr/src
 chmod $verbose 1777 /usr/src >&2
+echo 'export ENV=~/.ashrc' > /etc/profile.d/ashrc.sh
 __EOF__
 
 		wlimit_time_elapsed=$wlimit_time_short wlimit_time_idle=$wlimit_time_short wlimit_bytes_written=$wlimit_bytes_out \
