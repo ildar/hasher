@@ -414,6 +414,8 @@ make_repo()
 		mkdir -p $verbose -- ${repo_src:+"$repo_src"} ${repo_bin:+"$repo_bin"} >&2
 	fi
 	mkdir -p $verbose -- ${repo:-$def_repo}/aports/${target:-$def_target} >&2
+	[ -e ${repo:-$def_repo}/aports/noarch ] ||
+		ln -s $verbose ${target:-$def_target} ${repo:-$def_repo}/aports/noarch >&2
 }
 
 # assumed: defined variables: hash
@@ -737,9 +739,10 @@ allocate_lock_hasher_priv()
 print_uris()
 {
 	local out
-	# ignoring version conditions
-	local args=$(for p do p="${p%%>*}";p="${p%%~*}"; echo -n "$p "; done) # no $pkgname<=$pkgver in ref
-	local options="-R"
+	# TODO: handle deps conflicts (!pkg) more smoothly (cutting off now)
+	#       ignoring version conditions
+	local args=$(for p do p=${p##\!*};p="${p%%>*}";p="${p%%=*}";p="${p%%~*}"; echo -n "$p "; done) # no $pkgname<=$pkgver in ref
+	local options="-R -l"
 	[ -d "$chroot"/etc ] || options="$options --root $aptbox/tmp"
 	if [ -z "$verbose" ]; then
 		out="$("$aptbox/apk" fetch $options --simulate -o /dev/null -- $args 2>&1)" || {
