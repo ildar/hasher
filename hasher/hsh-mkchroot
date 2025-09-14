@@ -124,6 +124,10 @@ if [ -x /usr/libexec/hasher/busybox ]; then
 	install -p -m755 $verbose /usr/libexec/hasher/busybox .host/ >&2
 	./.host/busybox --list |
 		xargs -I{} ln -s $verbose busybox .host/{} >&2
+elif [ -x /bin/busybox.static ]; then
+	install -p -m755 $verbose /bin/busybox.static .host/busybox >&2
+	./.host/busybox --list |
+		xargs -I{} ln -s $verbose busybox .host/{} >&2
 else
 	install_static_helper ash sh
 	install_static_helper find
