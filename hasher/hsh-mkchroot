@@ -133,6 +133,8 @@ else
 	install_static_helper find
 	install_static_helper cpio
 fi
+install_static_helper ${prog_apk%.static} apk
+
 [ -z "$qemu_arch" ] ||
 	install_static_helper "qemu-$qemu_arch" "qemu-${qemu_arch/armh/arm}"
 postin="$HOME/.hasher/install/post"
