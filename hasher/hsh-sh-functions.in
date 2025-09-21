@@ -505,7 +505,7 @@ __EOF__
 	chmod 755 "$entry"
 }
 
-no_lock=
+#no_lock=
 workdir_is_locked=
 lock_workdir()
 {
