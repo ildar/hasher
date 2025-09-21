@@ -667,6 +667,7 @@ __EOF__
 		verbose 'Created rebuild script.'
 	fi
 
+	echo Start building "$source"
 	# Build the package.
 	purge_chroot_out
 	run_abuild
@@ -690,5 +691,7 @@ copy_results_packages()
 		  chmod 644 APKINDEX.tar.gz.$$ && \
 		  mv -f APKINDEX.tar.gz.$$ APKINDEX.tar.gz
 	)
+
+	echo Finished building "$source"
 }
 

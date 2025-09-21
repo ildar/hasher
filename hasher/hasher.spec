@@ -1,6 +1,6 @@
 Name: hasher
 Version: 1.7.4
-Release: alt1
+Release: alt1.apk
 
 Summary: Modern safe package building technology
 License: GPLv2+
@@ -70,6 +70,10 @@ fi
 %doc FAQ QUICKSTART README apt.conf *.sh
 
 %changelog
+* Mon Nov 25 2024 Ildar Mulyukov <ildar@altlinux.ru> 1.7.4-alt1.apk
+- dirty hack to build Alpine's APKs
+- not compatible with apt+rpm
+
 * Wed Apr 17 2024 Arseny Maslennikov <arseny@altlinux.org> 1.7.4-alt1
 - create_entry_header: source /etc/default-environment in the chroot if
   present.
