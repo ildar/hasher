@@ -340,7 +340,6 @@ handle_package()
 	fi
 	[ -z "${f##/*}" ] || f="$saved_cwd/$f"
 
-	rm -rf aptbox
 	if [ -d chroot ]; then
 		deduce_lock_hasher_priv
 		hsh-rmchroot --no-lock "$workdir" \
@@ -357,6 +356,9 @@ handle_package()
 		fi
 	fi
 
+	[ -z "$lazy_cleanup" ] &&
+		rm -rf aptbox
+	[ -d aptbox ] ||
 	mkaptbox --no-lock "$workdir" \
 		${target:+--target="$target"} \
 		${repo:+--repo="$repo"} \
