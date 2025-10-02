@@ -165,7 +165,7 @@ build_list=
 Helpify pkg_build_list
 
 # initial stage package file list
-pkg_init_list='alpine-base fakeroot util-linux-misc'
+pkg_init_list='alpine-base fakeroot util-linux-misc wget'
 init_list=
 Helpify pkg_init_list
 
@@ -220,7 +220,7 @@ save_fakeroot=
 Helpify save_fakeroot
 
 # whether to copy /etc/hosts, /etc/host.conf and /etc/resolv.conf from host system
-install_resolver_configuration_files=
+install_resolver_configuration_files=true
 Helpify install_resolver_configuration_files
 
 # target architecture.
