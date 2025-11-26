@@ -570,17 +570,6 @@ install_deps_aport()
 		"
 
 	# fetch the sources
-	echo "nameserver 8.8.8.8" | \
-	hsh-run ${verbose:+-v} --no-lock --rooter \
-		${quiet:+$quiet} \
-		${verbose:+$verbose} \
-		${number:+--number=$number} \
-		${exclude_docs:+--excludedocs} \
-		${hasher_priv_dir:+--hasher-priv-dir="$hasher_priv_dir"} \
-		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
-		-- \
-		"$workdir" \
-		tee /etc/resolv.conf
 	share_network=1 \
 	hsh-run ${verbose:+-v} --no-lock \
 		${quiet:+$quiet} \
@@ -591,7 +580,10 @@ install_deps_aport()
 		${known_mountpoints:+--mountpoints="$known_mountpoints"} \
 		-- \
 		"$workdir" \
-		/bin/sh -c "cd \$HOME/aports/* ; . \$HOME/.ashrc ;
+		/bin/sh -c "cd \$HOME/aports/* ;
+		export http_proxy=$http_proxy ;
+		export https_proxy=$https_proxy ;
+		. \$HOME/.ashrc ;
 		export CBUILD=${target:-$def_target} ;
 		abuild fetch"
 	hsh-run ${verbose:+-v} --no-lock --rooter \
